@@ -32,13 +32,13 @@ public:
 class CubicSpline2D {
 private:
 	CubicSpline1D sx;
-	CubicSpline1D sy;
-	vector<double> calc_s(const std::vector<double>& x, const std::vector<double>& y);
-
+    CubicSpline1D sy;
+    void calc_s(const std::vector<double>& x, const std::vector<double>& y,vector<double> &s);
 public:
-	vector<double> s;
+    vector<double> s;
 	CubicSpline2D(const std::vector<double>& x, const std::vector<double>& y);
 	pair<double, double> calc_position(double x_val, const vector<double> s);
 	void display();
+    void calc_yaw(const std::vector<double>&x, const std::vector<double>& y, vector<double> &dyaw);
 };
 #endif

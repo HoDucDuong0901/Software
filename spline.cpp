@@ -1,4 +1,5 @@
 ﻿#include "spline.h"
+/*-----------Cubic spline 2D -> interpolation 1D------------------ */
 CubicSpline1D::CubicSpline1D() {
 }
 CubicSpline1D::CubicSpline1D(const vector<double>& x, const vector<double>& y) { 
@@ -42,7 +43,7 @@ void CubicSpline1D::calc_B(const std::vector<double>& h, std::vector<double> a, 
 vector<double> CubicSpline1D::diff(const std::vector<double>& arr) {
 	std::vector<double> result(arr.size() - 1, 0.0);
 	//adjacent_difference(arr.begin(), arr.end(), result.begin());
-	for (int i = 0; i < result.size(); i++) {
+    for (int i = 0; i < (int)result.size(); i++) {
 		result[i]  = arr[i + 1] - arr[i];
 	}
 	return result;
@@ -164,11 +165,11 @@ void CubicSpline1D::display() {
 }
 /*-------------------------------------------------------------------------------------------------------------------------------------------------*/
 CubicSpline2D::CubicSpline2D(const std::vector<double>& x, const std::vector<double>& y) {
-	s = calc_s(x, y);
+    calc_s(x, y,s);
 	sx = CubicSpline1D(s, x);
 	sy = CubicSpline1D(s, y);
 }
-vector<double> CubicSpline2D::calc_s(const std::vector<double>& x, const std::vector<double>& y) {
+void CubicSpline2D::calc_s(const std::vector<double>& x, const std::vector<double>& y,vector<double> &s) {
 	std::vector<double> dx(x.size() - 1);
 	std::vector<double> dy(y.size() - 1);
 	for (size_t i = 0; i < dx.size(); ++i) {
@@ -179,12 +180,23 @@ vector<double> CubicSpline2D::calc_s(const std::vector<double>& x, const std::ve
 	for (size_t i = 0; i < ds.size(); ++i) {
 		ds[i] = hypot(dx[i], dy[i]);
 	}
-	std::vector<double> s(ds.size() + 1);
+    s.resize(ds.size() + 1);
+    //std::vector<double> s(ds.size() + 1);
 	s[0] = 0.0;
 	for (size_t i = 0; i < ds.size(); ++i) {
 		s[i + 1] = s[i] + ds[i];
-	}
-	return s;
+    }
+}
+
+void CubicSpline2D::calc_yaw(const std::vector<double> &x, const std::vector<double> &y, vector<double> &dyaw)
+{
+    std::vector<double> dx(x.size() - 1);
+    std::vector<double> dy(y.size() - 1);
+    for (size_t i = 0; i < dx.size(); ++i) {
+        dx[i] = x[i + 1] - x[i];
+        dy[i] = y[i + 1] - y[i];
+        dyaw.push_back(atan2(dy[i],dx[i]));
+    }
 }
 pair<double, double> CubicSpline2D::calc_position(double x_val, const vector<double> s) {
 	double x = sx.calc_position(x_val, s);

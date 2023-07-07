@@ -1,20 +1,38 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-uint8_t bSTX =  0x02 ;
-uint8_t bSYNC =  0x16 ;
-uint8_t bACK =   0x06 ;
-uint8_t bEXT =  0x03 ;
-uint8_t writebuffer[10] = {0};
-uint8_t bSPID[1] = { 0x53};
-uint8_t bMVEL[1] = { 0x4D};
-uint8_t bSTOP[1] = {0x45};
-uint8_t bcmd[1] = {0};
-uint8_t bdata[6] = {0};
-    MainWindow::MainWindow(QWidget *parent)
+/*-------------Protocol------------
+---- 1 byte STX --- 4 bytes Cmd --- 3 bytes option --- 50 bytes data ---
+---- 1 byte SYN --- 1 byte ETX*/
+
+// for synchronous
+uint8_t bSTX[] =   {0x02} ;
+uint8_t bSYNC[] =  {0x16} ;
+uint8_t bACK[] =   {0x06} ;
+uint8_t bEXT[] =   {0x03} ;
+// for cmd
+uint8_t bSMAP[4] = {0x53, 0x4D, 0x41, 0x50};
+uint8_t bSPAR[4] = {0x53, 0x50, 0x41, 0x52};
+uint8_t bVMOV[4] = {0x56, 0x4D, 0x4F, 0x56};
+uint8_t bSTOP[4] = {0x53, 0x54, 0x4F, 0x50};
+uint8_t bCDAT[4] = {0x43, 0x44, 0x41, 0x54};
+//
+uint8_t writebuffer[63] = {0};
+uint8_t bOption[3] = {0};
+//for parameters
+uint8_t bPIDM1[6] = {0};
+uint8_t bPIDM2[6] = {0};
+uint8_t bVelM1[2] = {0};
+uint8_t bVelM2[2] = {0};
+
+uint8_t bDataPoint[10] = {0};
+MainWindow::MainWindow(QWidget *parent)
         : QMainWindow(parent)
         , ui(new Ui::MainWindow)
     {
     ui->setupUi(this);
+    uCount = 0;
+    uCurrentPoint = 0;
+    uCountYaw = 0;
     m_serial = new QSerialPort;
     ui->ccb_baudrate->addItem("1200");
     ui->ccb_baudrate->addItem("2400");
@@ -32,10 +50,10 @@ uint8_t bdata[6] = {0};
     }
     // Initial Value
     bPortOpen = false;
-
+    Timer = new QTimer(this);
     //signal and slots
     connect(m_serial,&QSerialPort::readyRead,this,&MainWindow::readData);
-
+    connect(Timer,&QTimer::timeout,this,&MainWindow::TimeOut_Event);
     // For Configurating Motor1 Chart
     ui->Motor1_Chart->addGraph();
     ui->Motor1_Chart->graph(0)->setScatterStyle(QCPScatterStyle::ssNone);
@@ -81,6 +99,9 @@ uint8_t bdata[6] = {0};
     ui->Map_Chart->graph(1)->setLineStyle(QCPGraph::lsNone);
     ui->Map_Chart->graph(1)->setName("");
     ui->Map_Chart->graph(1)->setPen((QPen(QColor(0, 0, 255))));
+    //
+
+    //
 }
 
 MainWindow::~MainWindow()
@@ -139,9 +160,7 @@ void MainWindow::on_btn_open_clicked()
     }
 }
 void MainWindow::on_btn_sendpidm1_clicked()
-{   QStringList hexList;
-    dTime = 0.0;
-    memcpy(bcmd,bSPID,1);
+{
     uint8_t bKpM1[2] = {0}, bKiM1[2] = {0}, bKdM1[2] = {0};
     double dKpM1 = (ui->edt_kp->text()).toDouble(nullptr);
     double dKiM1 = (ui->edt_ki->text()).toDouble(nullptr);
@@ -150,111 +169,53 @@ void MainWindow::on_btn_sendpidm1_clicked()
     FloatToByte(dKiM1,bKiM1);
     FloatToByteArrayWithNipes(dKdM1,bKdM1);
     uint8_t index = 0;
-    memcpy(bdata + index,bKpM1,2);
+    memcpy(bPIDM1 + index,bKpM1,2);
     index += sizeof(bKpM1);
-    memcpy(bdata + index,bKiM1,2);
+    memcpy(bPIDM1 + index,bKiM1,2);
     index += sizeof(bKiM1);
-    memcpy(bdata + index,bKdM1,2);
-    //
-    memcpy(&writebuffer[0],&bSTX,1);
-    memcpy(&writebuffer[1],bcmd,1);
-    memcpy(&writebuffer[2],bdata,6);
-    memcpy(&writebuffer[8],&bSYNC,1);
-    memcpy(&writebuffer[9],&bEXT,1);
-    for(int i =0; i< 10; i++){
-       QString hexString = QString::number(writebuffer[i], 16).rightJustified(2, '0');
-       hexList.append(hexString);
-    }
-    QString sdata = "Transmitted data:  " + hexList.join("    ") ;
-    ui->list_dataReceive->addItem(sdata);
-    m_serial->write((char*)writebuffer,10);
+    memcpy(bPIDM1 + index,bKdM1,2);
 }
 
 
 void MainWindow::on_btn_sendvrefm1_clicked()
 {
-    QStringList hexList;
     uint8_t bVel[2] = {0};
-    memcpy(bcmd,bMVEL,1);
-    uint16_t dVel = (uint16_t)(ui->edt_vref->text()).toDouble(nullptr);
-    //FloatToByte(dVel,bVel);
-    bVel[0] = (dVel >> 8) & 0xFF;
-    bVel[1] = dVel & 0xFF;
-    memcpy(bdata,bVel,2);
-    //
-    memcpy(&writebuffer[0],&bSTX,1);
-    memcpy(&writebuffer[1],bcmd,1);
-    memcpy(&writebuffer[2],bdata,6);
-    memcpy(&writebuffer[8],&bSYNC,1);
-    memcpy(&writebuffer[9],&bEXT,1);
-    for(int i =0; i< 10; i++){
-       QString hexString = QString::number(writebuffer[i], 16).rightJustified(2, '0');
-       hexList.append(hexString);
-    }
-    QString sdata = "Transmitted data:  " + hexList.join("    ") ;
-    ui->list_dataReceive->addItem(sdata);
-    m_serial->write((char*)writebuffer,10);
+    double dVel = (uint16_t)(ui->edt_vref->text()).toDouble(nullptr);
+    int nVel = (uint8_t)dVel;
+    int nDigit = (dVel - nVel)*100;
+    bVel[0] = nVel  & 0xFF;
+    bVel[1] = nDigit & 0xFF;
+    memcpy(bVelM1,bVel,2);
 }
 
 
 void MainWindow::on_btn_sendpidm2_clicked()
 {
-    QStringList hexList;
-    dTime = 0.0;
-    memcpy(bcmd,bSPID,1);
-    uint8_t bKpM2[2] = {0}, bKiM2[2] = {0}, bKdM2[2] = {0};
     uint8_t index = 0;
+    uint8_t bKpM2[2] = {0}, bKiM2[2] = {0}, bKdM2[2] = {0};
     double dKpM2 = (ui->edt_kp_2->text()).toDouble(nullptr);
     double dKiM2 = (ui->edt_ki_2->text()).toDouble(nullptr);
     double dKdM2 = (ui->edt_kd_2->text()).toDouble(nullptr);
     FloatToByte(dKpM2,bKpM2);
     FloatToByte(dKiM2,bKiM2);
     FloatToByteArrayWithNipes(dKdM2,bKdM2);
-    memcpy(bdata + index,bKpM2,2);
+    memcpy(bPIDM2 + index,bKpM2,2);
     index += sizeof(bKpM2);
-    memcpy(bdata + index,bKiM2,2);
+    memcpy(bPIDM2 + index,bKiM2,2);
     index += sizeof(bKiM2);
-    memcpy(bdata + index,bKdM2,2);
-    //
-    memcpy(&writebuffer[0],&bSTX,1);
-    memcpy(&writebuffer[1],bcmd,1);
-    memcpy(&writebuffer[2],bdata,6);
-    memcpy(&writebuffer[8],&bSYNC,1);
-    memcpy(&writebuffer[9],&bEXT,1);
-    //
-    for(int i =0; i< 10; i++){
-       QString hexString = QString::number(writebuffer[i], 16).rightJustified(2, '0');
-       hexList.append(hexString);
-    }
-    QString sdata = "Transmitted data:  " + hexList.join("    ") ;
-    ui->list_dataReceive->addItem(sdata);
-    m_serial->write((char*)writebuffer,10);
+    memcpy(bPIDM2 + index,bKdM2,2);
 }
 
 
 void MainWindow::on_btn_sendvrefm2_clicked()
 {
-    QStringList hexList;
     uint8_t bVel[2] = {0};
-    memcpy(bcmd,bMVEL,1);
-    uint16_t dVel = (uint16_t)(ui->edt_vref_2->text()).toDouble(nullptr);
-    //FloatToByte(dVel,bVel);
-    bVel[0] = (dVel >> 8) & 0xFF;
-    bVel[1] = dVel & 0xFF;
-    memcpy(bdata,bVel,2);
-    //
-    memcpy(&writebuffer[0],&bSTX,1);
-    memcpy(&writebuffer[1],bcmd,1);
-    memcpy(&writebuffer[2],bdata,6);
-    memcpy(&writebuffer[8],&bSYNC,1);
-    memcpy(&writebuffer[9],&bEXT,1);
-    for(int i =0; i< 10; i++){
-       QString hexString = QString::number(writebuffer[i], 16).rightJustified(2, '0');
-       hexList.append(hexString);
-    }
-    QString sdata = "Transmitted data:  " + hexList.join("    ") ;
-    ui->list_dataReceive->addItem(sdata);
-    m_serial->write((char*)writebuffer,10);
+    double dVel = (uint16_t)(ui->edt_vref_2->text()).toDouble(nullptr);
+    int nVel = (int)dVel;
+    int nDigit = (dVel - nVel)*100;
+    bVel[0] = nVel  & 0xFF;
+    bVel[1] = nDigit & 0xFF;
+    memcpy(bVelM2,bVel,2);
 }
 
 
@@ -266,21 +227,6 @@ void MainWindow::on_btn_cleardata_clicked()
 
 void MainWindow::on_btn_stop_clicked()
 {
-   QStringList hexList;
-   memcpy(bcmd,bSTOP,1);
-   memset(bdata,0,6);
-   memcpy(&writebuffer[0],&bSTX,1);
-   memcpy(&writebuffer[1],bcmd,1);
-   memcpy(&writebuffer[2],bdata,6);
-   memcpy(&writebuffer[8],&bSYNC,1);
-   memcpy(&writebuffer[9],&bEXT,1);
-   for(int i =0; i< 10; i++){
-      QString hexString = QString::number(writebuffer[i], 16).rightJustified(2, '0');
-      hexList.append(hexString);
-   }
-   QString sdata = "Transmitted data:  " + hexList.join("    ") ;
-   ui->list_dataReceive->addItem(sdata);
-   m_serial->write((char*)writebuffer,10);
 
 
 }
@@ -317,7 +263,7 @@ void MainWindow::on_btn_readMap_clicked()
 {
     tinyxml2::XMLDocument doc;
     uint8_t uPoint = 0;
-    if (!doc.LoadFile("C:/Important Things/Thesis/Software/robot/UTM2.kml"))
+    if (!doc.LoadFile("C:/ImportantThings/Thesis/Software/robot/UTM3.kml"))
     {
         qDebug() << "FILE KML READ SUCCESS";
     }
@@ -377,20 +323,16 @@ void MainWindow::on_btn_readMap_clicked()
 
 void MainWindow::on_btn_drawMap_clicked()
 {
-    vector<double>xval;
-    vector<double>yval;
-    vector<double>x ;
-    vector<double>y ;
     for(int i = 0; i < dEast.size(); i++){
         x.push_back(dEast[i]);
     }
     for(int i =0; i < dNorth.size(); i++){
         y.push_back(dNorth[i]);
     }
-    CubicSpline2D sp(x, y);
     double ds = 0.5;
-    std::vector<double> s;
-    for (double val = 0.0; val < sp.s.back(); val += ds) {
+    CubicSpline2D sp(x,y);
+    std::vector<double>s;
+    for(double val = 0.0; val < sp.s.back(); val += ds) {
         s.push_back(val);
     }
     for (double i_s : s) {
@@ -399,9 +341,102 @@ void MainWindow::on_btn_drawMap_clicked()
         yval.push_back(value.second);
     }
     for(int i = 0; i < (int)xval.size(); i++){
-    ui->Map_Chart->graph(1)->addData(xval[i],yval[i]);
-    ui->Map_Chart->rescaleAxes();
-    ui->Map_Chart->replot();
+        ui->Map_Chart->graph(1)->addData(xval[i],yval[i]);
+        ui->Map_Chart->rescaleAxes();
+        ui->Map_Chart->replot();
+
     }
+    sp.calc_yaw(xval,yval,dYaw);
+    size_t index = dYaw.size();
+    for(size_t i = 0; i < index ; i++){
+        ui->Motor2_Chart->graph(0)->addData(i,dYaw[i]);
+        ui->Motor2_Chart->rescaleAxes();
+        ui->Motor2_Chart->replot();
+    }
+    qDebug() << "There are " << xval.size() << " points";
+    uPointNumber = xval.size();
+    QString str = QString::number(xval.size());
+    ui->labl_TotalPoint->setText(str);
+}
+void MainWindow::DoubleToByte(double dEast, double dNorth,uint8_t* bEast, uint8_t* bNorth){
+    double North = dNorth - 1191000;
+    double East  =  dEast - 681000;
+    int nNorth = (int)North;
+    int nEast = (int)East;
+    int nNorthDigit = (North - nNorth)*1000000;
+    int nEastDigit = (East - nEast)*1000000;
+    bNorth[0] = (nNorth >> 8) & 0xFF;
+    bNorth[1] = nNorth & 0xFF;
+    bNorth[2] = (nNorthDigit >> 16) & 0xFF;
+    bNorth[3] = (nNorthDigit >> 8)  & 0xFF;
+    bNorth[4] = nNorthDigit & 0xFF;
+    //
+    bEast[0] = (nEast >> 8) & 0xFF;
+    bEast[1] = nEast & 0xFF;
+    bEast[2] = (nEastDigit >> 16) & 0xFF;
+    bEast[3] = (nEastDigit >> 8)  & 0xFF;
+    bEast[4] = nEastDigit & 0xFF;
+}
+
+void MainWindow::on_btn_SendMap_clicked()
+{
+      int nIndex = 0;
+      memcpy(writebuffer + nIndex,bSTX,1);
+      nIndex += 1;
+      memcpy(writebuffer + nIndex, bSMAP,sizeof(bSMAP));
+      nIndex += sizeof(bSMAP);
+      writebuffer[62] = bEXT[0];
+      writebuffer[61] = bSYNC[0];
+      Timer->setInterval(1000);
+      Timer->start();
+      this->uCount = (uint32_t)(uPointNumber/5);
+      uCurrentPoint = 0;
+}
+
+void MainWindow::TimeOut_Event()
+{
+    uint8_t bNorth[5] = {0};
+    uint8_t bEast[5] = {0};
+    double dNorth = 0,dEast = 0, dNorthValue = 0, dEastValue = 0;
+    if(this->uCount != 0){
+        for(uint8_t nIndex = 0; nIndex < 5; nIndex++){
+            dEast  = xval[uCurrentPoint];
+            dNorth = yval[uCurrentPoint];
+            DoubleToByte(dEast,dNorth,bEast,bNorth);
+            dNorthValue = ((bNorth[0] << 8) + bNorth[1]) + (double)((bNorth[2] << 16) +
+                           (bNorth[3] << 8) + bNorth[4])/1000000 + 1191000;
+            dEastValue = ((bEast[0] << 8) + bEast[1]) + (double)((bEast[2] << 16) +
+                           (bEast[3] << 8) + bEast[4])/1000000 + 681000;
+            std::cout << std::fixed << std::setprecision(8) <<"North value: " << dNorthValue << "    East value: " << dEastValue << std::endl;
+            std::cout << "             " << yval[uCurrentPoint]<<"               " << xval[uCurrentPoint] << std::endl;
+
+            uCurrentPoint++;
+        }
+
+        std::cout << this->uCount << std::endl;
+        (this->uCount)--;
+     }
+    else if(uPointNumber == 0){
+        Timer->stop();
+        qDebug() << "Let's pray";
+    }
+    else{
+        printf("\nhello");
+        uint8_t uIndex = (uint8_t)(uPointNumber % 5);
+        for(uint8_t i = 0 ; i < uIndex; i++){
+            dEast  = xval[uCurrentPoint];
+            dNorth = yval[uCurrentPoint];
+            DoubleToByte(dEast,dNorth,bEast,bNorth);
+            dNorthValue = ((bNorth[0] << 8) + bNorth[1]) + (double)((bNorth[2] << 16) +
+                           (bNorth[3] << 8) + bNorth[4])/1000000 + 1191000;
+            dEastValue = ((bEast[0] << 8) + bEast[1]) + (double)((bEast[2] << 16) +
+                           (bEast[3] << 8) + bEast[4])/1000000 + 681000;
+            std::cout << std::fixed << std::setprecision(8) <<"North value: " << dNorthValue << "    East value: " << dEastValue << std::endl;
+            std::cout << "             " << yval[uCurrentPoint]<<"               " << xval[uCurrentPoint] << std::endl;
+            uCurrentPoint++;
+        }
+        Timer->stop();
+    }
+
 }
 

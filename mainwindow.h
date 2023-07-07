@@ -9,6 +9,8 @@
 #include <iostream>
 #include <iomanip>
 #include <limits>
+#include <QTimer>
+#include <stdio.h>
 #include "tinyxml2.h"
 #include "spline.h"
 #include "GeographicLib/UTMUPS.hpp"
@@ -27,6 +29,8 @@ public:
     ~MainWindow();
     void FloatToByte(double dnumber, uint8_t* bOut);
     void FloatToByteArrayWithNipes(double dnumber, uint8_t* bOut);
+    void DoubleToByte(double dNorth, double dEast, uint8_t* bEast, uint8_t* bNorth);
+    //void ConvertDoubleToByte(double )
 private slots:
 
     void on_btn_open_clicked();
@@ -48,6 +52,11 @@ private slots:
 
     void on_btn_drawMap_clicked();
 
+
+    void on_btn_SendMap_clicked();
+
+    void TimeOut_Event();
+
 private:
     Ui::MainWindow *ui;
     long m_baudrate;
@@ -56,6 +65,17 @@ private:
     bool bPortOpen = false;
     QVector<double> dVmotor1, dVmotor2,Time;
     double dTime = 0.0;
+    vector<double>x ;
+    vector<double>y ;
     QVector<double> dEast, dNorth;
+    vector<double>dYaw;
+    vector<double>xval;
+    vector<double>yval;
+    unsigned int unPoint = 0;
+    uint32_t uPointNumber = 0;
+    uint32_t uCount = 0;
+    uint32_t uCurrentPoint = 0;
+    uint32_t uCountYaw = 0;
+    QTimer* Timer;
 };
 #endif // MAINWINDOW_H
