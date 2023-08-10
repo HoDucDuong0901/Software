@@ -293,6 +293,8 @@ void MainWindow::readData()
         else{
             dYaw = array[16] + ((double)array[17])/100;
         }
+        QString sYaw = QString::number(dYaw);
+        ui->labl_CurrentAngle->setText(sYaw);
         std::cout << "Yaw angle: " << dYaw  << std::fixed << std::setprecision(8) << std::endl;
         std::cout << "East value: " << dEast  << std::fixed << std::setprecision(8) << std::endl;
         std::cout << "North value: " << dNorth  << std::fixed << std::setprecision(8) << std::endl;
@@ -311,7 +313,7 @@ void MainWindow::on_btn_readMap_clicked()
 {
     tinyxml2::XMLDocument doc;
     uint8_t uPoint = 0;
-    if (!doc.LoadFile("C:/ImportantThings/Thesis/Software/robot/test.kml"))
+    if (!doc.LoadFile("C:/ImportantThings/Thesis/Software/robot/path1.kml"))
     {
         qDebug() << "FILE KML READ SUCCESS";
     }
