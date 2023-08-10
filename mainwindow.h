@@ -11,6 +11,7 @@
 #include <limits>
 #include <QTimer>
 #include <stdio.h>
+#include <QMessageBox>
 #include "tinyxml2.h"
 #include "spline.h"
 #include "GeographicLib/UTMUPS.hpp"
@@ -30,7 +31,7 @@ public:
     void FloatToByte(double dnumber, uint8_t* bOut);
     void FloatToByteArrayWithNipes(double dnumber, uint8_t* bOut);
     void DoubleToByte(double dNorth, double dEast, uint8_t* bEast, uint8_t* bNorth);
-    //void ConvertDoubleToByte(double )
+    void ConvertDoubleToByte(double dYaw,uint8_t* arr);
 private slots:
 
     void on_btn_open_clicked();
@@ -56,6 +57,14 @@ private slots:
     void on_btn_SendMap_clicked();
 
     void TimeOut_Event();
+
+    void on_btn_ClearMap_clicked();
+
+    void on_btn_SetStanley_clicked();
+
+    void on_btn_SetFuzzy_clicked();
+
+    void on_btn_SendData_clicked();
 
 private:
     Ui::MainWindow *ui;

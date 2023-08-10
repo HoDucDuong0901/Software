@@ -195,6 +195,7 @@ void CubicSpline2D::calc_yaw(const std::vector<double> &x, const std::vector<dou
     for (size_t i = 0; i < dx.size(); ++i) {
         dx[i] = x[i + 1] - x[i];
         dy[i] = y[i + 1] - y[i];
+        double ya = atan2(dy[i],dx[i]);
         dyaw.push_back(atan2(dy[i],dx[i]));
     }
 }
